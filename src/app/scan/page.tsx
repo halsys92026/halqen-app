@@ -119,10 +119,32 @@ export default function ScanPage() {
           <div>
             <div style={{ color: '#5FAE8F', fontSize: 12, marginBottom: 16 }}>✓ Code verified</div>
             <div style={{ background: `${profile.color}1A`, border: `1px solid ${profile.color}55`, borderRadius: 16, padding: 20, marginBottom: 16 }}>
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.15em', color: profile.color, marginBottom: 8 }}>
-                {profile.business}
-              </p>
-              <h2 style={{ fontSize: 20, color: '#F2EEE6', marginBottom: 4 }}>{profile.display_name}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                {profile.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.photo_url}
+                    alt={profile.display_name}
+                    style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `1px solid ${profile.color}66` }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 48, height: 48, borderRadius: '50%', background: `${profile.color}33`, color: profile.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'monospace', fontSize: 18,
+                      border: `1px solid ${profile.color}66`, flexShrink: 0,
+                    }}
+                  >
+                    {(profile.display_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.15em', color: profile.color }}>
+                    {profile.business}
+                  </p>
+                  <h2 style={{ fontSize: 18, color: '#F2EEE6' }}>{profile.display_name}</h2>
+                </div>
+              </div>
               <p style={{ fontSize: 13, color: '#8A8478', marginBottom: 12 }}>{profile.title}</p>
               <p style={{ fontSize: 14, color: '#F2EEE6' }}>{profile.phone}</p>
               <p style={{ fontSize: 14, color: '#F2EEE6' }}>{profile.email}</p>
