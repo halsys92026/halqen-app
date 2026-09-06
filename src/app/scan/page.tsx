@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Logo } from '@/components/Logo';
 
 type Profile = {
   kind: string;
@@ -64,14 +65,17 @@ export default function ScanPage() {
 
   return (
     <div
-      style={{ background: '#1C1B19', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'Inter, sans-serif' }}
+      style={{ background: '#0A1330', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'Inter, sans-serif' }}
     >
       <div
-        style={{ width: '100%', maxWidth: 380, background: '#221F1B', border: '1px solid #3a352c', borderRadius: 32, padding: 32, boxShadow: '0 30px 60px -20px rgba(0,0,0,0.6)' }}
+        style={{ width: '100%', maxWidth: 380, background: '#111a3d', border: '1px solid #22305e', borderRadius: 32, padding: 32, boxShadow: '0 30px 60px -20px rgba(0,0,0,0.6)' }}
       >
         {!profile ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ color: '#8A8478', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 24 }}>
+            <div style={{ marginBottom: 20 }}>
+              <Logo size={30} wordmarkSize={17} />
+            </div>
+            <div style={{ color: '#8B93B8', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 24 }}>
               Enter access code
             </div>
             <div style={{ display: 'flex', gap: 10, marginBottom: 28, animation: shake ? 'shake 0.4s' : 'none' }}>
@@ -80,8 +84,8 @@ export default function ScanPage() {
                   key={i}
                   style={{
                     width: 48, height: 56, borderRadius: 12,
-                    border: `1px solid ${entered.length > i ? '#C08A4E' : '#3a352c'}`,
-                    background: '#1C1B19', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1px solid ${entered.length > i ? '#5AA7FF' : '#22305e'}`,
+                    background: '#0A1330', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#F2EEE6', fontSize: 20, fontFamily: 'monospace',
                   }}
                 >
@@ -98,7 +102,7 @@ export default function ScanPage() {
                   <button
                     key={i}
                     onClick={() => setEntered(entered.slice(0, -1))}
-                    style={{ height: 52, borderRadius: 14, border: 'none', background: 'transparent', color: '#8A8478', fontSize: 16, cursor: 'pointer' }}
+                    style={{ height: 52, borderRadius: 14, border: 'none', background: 'transparent', color: '#8B93B8', fontSize: 16, cursor: 'pointer' }}
                   >
                     ⌫
                   </button>
@@ -107,7 +111,7 @@ export default function ScanPage() {
                     key={i}
                     onClick={() => pressDigit(d)}
                     disabled={loading}
-                    style={{ height: 52, borderRadius: 14, border: '1px solid #3a352c', background: 'transparent', color: '#F2EEE6', fontSize: 17, cursor: 'pointer' }}
+                    style={{ height: 52, borderRadius: 14, border: '1px solid #22305e', background: 'transparent', color: '#F2EEE6', fontSize: 17, cursor: 'pointer' }}
                   >
                     {d}
                   </button>
@@ -145,13 +149,13 @@ export default function ScanPage() {
                   <h2 style={{ fontSize: 18, color: '#F2EEE6' }}>{profile.display_name}</h2>
                 </div>
               </div>
-              <p style={{ fontSize: 13, color: '#8A8478', marginBottom: 12 }}>{profile.title}</p>
+              <p style={{ fontSize: 13, color: '#8B93B8', marginBottom: 12 }}>{profile.title}</p>
               <p style={{ fontSize: 14, color: '#F2EEE6' }}>{profile.phone}</p>
               <p style={{ fontSize: 14, color: '#F2EEE6' }}>{profile.email}</p>
             </div>
             <button
               onClick={reset}
-              style={{ width: '100%', padding: 12, borderRadius: 14, border: 'none', background: '#F2EEE6', color: '#1C1B19', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', padding: 12, borderRadius: 14, border: 'none', background: '#F2EEE6', color: '#0A1330', fontWeight: 600, cursor: 'pointer' }}
             >
               Done
             </button>
