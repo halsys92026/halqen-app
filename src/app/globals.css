@@ -1,26 +1,86 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --hq-bg: #0A1330;
+  --hq-bg-glow: #16204f;
+  --hq-panel: #111a3d;
+  --hq-panel-elevated: #15214a;
+  --hq-border: #22305e;
+  --hq-border-hover: #2d3d70;
+  --hq-text: #F2EEE6;
+  --hq-muted: #8B93B8;
+  --hq-accent: #5AA7FF;
+  --hq-accent-deep: #2F6BFF;
+  --hq-success: #5FAE8F;
+  --hq-error: #e07a63;
+  --hq-radius-sm: 8px;
+  --hq-radius-md: 12px;
+  --hq-radius-lg: 20px;
+  --hq-shadow-card: 0 24px 48px -16px rgba(0, 0, 0, 0.55);
+  --hq-font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --hq-font-display: 'Space Grotesk', sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  background: var(--hq-bg);
+  color: var(--hq-text);
+  font-family: var(--hq-font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+::selection {
+  background: rgba(90, 167, 255, 0.35);
+  color: var(--hq-text);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--hq-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hq-border);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--hq-border-hover);
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+button {
+  transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input, select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--hq-accent) !important;
+  box-shadow: 0 0 0 3px rgba(90, 167, 255, 0.15);
+}
+
+@keyframes hq-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hq-spin {
+  to { transform: rotate(360deg); }
 }

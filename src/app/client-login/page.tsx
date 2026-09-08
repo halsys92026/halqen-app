@@ -7,7 +7,7 @@ import { PageShell, Card, Spinner } from '@/components/Layout';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 
-export default function LoginPage() {
+export default function ClientLoginPage() {
   const [email, setEmail] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [sent, setSent] = useState(false);
@@ -21,7 +21,7 @@ export default function LoginPage() {
     setSending(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
+      options: { emailRedirectTo: `${window.location.origin}/client-dashboard` },
     });
     setSending(false);
     if (error) setError(error.message);
@@ -32,7 +32,7 @@ export default function LoginPage() {
     <PageShell maxWidth={380}>
       <Card>
         <h1 style={{ fontSize: 16, marginBottom: 6, textAlign: 'center', color: '#F2EEE6', fontWeight: 600 }}>
-          Owner login
+          Client / property manager login
         </h1>
         {sent ? (
           <div style={{ textAlign: 'center', animation: 'hq-fade-in 0.3s ease' }}>
@@ -46,17 +46,17 @@ export default function LoginPage() {
                 ✓
               </div>
             </div>
-            <p style={{ color: '#8B93B8', fontSize: 14 }}>Check your email for a sign-in link — no password needed.</p>
+            <p style={{ color: '#8B93B8', fontSize: 14 }}>Check your email for a sign-in link.</p>
           </div>
         ) : (
           <form onSubmit={sendLink}>
             <p style={{ color: '#8B93B8', fontSize: 13, marginBottom: 18, textAlign: 'center' }}>
-              We&apos;ll email you a secure link — no password to remember.
+              See the vendors who&apos;ve granted you standing access to their verification status.
             </p>
             <Input
               type="email"
               required
-              placeholder="you@email.com"
+              placeholder="you@propertymanagement.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
