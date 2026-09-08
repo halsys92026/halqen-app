@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { LoadingScreen } from '@/components/Layout';
+import { LoadingScreen, expirationBadge } from '@/components/Layout';
 
 type ClientAccount = {
   id: string;
@@ -230,8 +230,15 @@ export default function ClientDashboard() {
                 ) : (
                   <div style={{ borderTop: '1px solid #1a2450', paddingTop: 10 }}>
                     {(credentialsByIdentity[v.id] || []).map((c) => (
-                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '5px 0' }}>
-                        <span>{c.label || CREDENTIAL_LABELS[c.credential_type] || c.credential_type}</span>
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, padding: '5px 0' }}>
+                        <span>
+                          {c.label || CREDENTIAL_LABELS[c.credential_type] || c.credential_type}
+                          {expirationBadge(c.expiration_date) && (
+                            <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 6, color: expirationBadge(c.expiration_date)!.color, background: expirationBadge(c.expiration_date)!.bg }}>
+                              {expirationBadge(c.expiration_date)!.text}
+                            </span>
+                          )}
+                        </span>
                         {c.status === 'active' ? (
                           <span style={{ color: '#5FAE8F', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: '50%', background: 'rgba(95,174,143,0.15)', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</span>

@@ -53,6 +53,17 @@ export function PageShell({
   );
 }
 
+export function expirationBadge(expirationDate: string | null): { text: string; color: string; bg: string } | null {
+  if (!expirationDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const exp = new Date(expirationDate);
+  const daysLeft = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysLeft < 0) return { text: '⛔ Expired', color: '#e07a63', bg: 'rgba(224,122,99,0.12)' };
+  if (daysLeft <= 30) return { text: `⚠️ Expires in ${daysLeft}d`, color: '#e0a663', bg: 'rgba(224,166,99,0.12)' };
+  return null;
+}
+
 export function Spinner({ size = 20 }: { size?: number }) {
   return (
     <div

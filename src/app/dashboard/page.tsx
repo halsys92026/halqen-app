@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Logo } from '@/components/Logo';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { LoadingScreen, Spinner } from '@/components/Layout';
+import { LoadingScreen, Spinner, expirationBadge } from '@/components/Layout';
 
 type Identity = {
   id: string;
@@ -183,6 +183,11 @@ function CredentialsSection({ identityId }: { identityId: string }) {
             )}
             {c.issuing_state && <span style={{ fontSize: 11, color: '#8B93B8', marginLeft: 8 }}>{c.issuing_state}</span>}
             {c.expiration_date && <span style={{ fontSize: 11, color: '#8B93B8', marginLeft: 8 }}>exp {c.expiration_date}</span>}
+            {expirationBadge(c.expiration_date) && (
+              <span style={{ fontSize: 10.5, marginLeft: 8, padding: '2px 6px', borderRadius: 6, color: expirationBadge(c.expiration_date)!.color, background: expirationBadge(c.expiration_date)!.bg }}>
+                {expirationBadge(c.expiration_date)!.text}
+              </span>
+            )}
             <div style={{ fontSize: 11, marginTop: 3 }}>
               {c.status === 'active' ? (
                 <span style={{ color: '#5FAE8F', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -302,6 +307,112 @@ function AccessLogSection({ identityId }: { identityId: string }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+type RecipientCode = {
+  id: string;
+  code: string;
+  label: string | null;
+  is_active: boolean;
+  revoked_at: string | null;
+  last_used_at: string | null;
+};
+
+function RecipientCodesSection({ identityId }: { identityId: string }) {
+  const [codes, setCodes] = useState<RecipientCode[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [draftCode, setDraftCode] = useState('');
+  const [draftLabel, setDraftLabel] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { load(); }, [identityId]);
+
+  async function load() {
+    const { data } = await supabase.from('identity_codes').select('*').eq('identity_id', identityId).order('created_at', { ascending: false });
+    if (data) setCodes(data as RecipientCode[]);
+  }
+
+  async function addCode() {
+    setError(null);
+    if (!/^\d{4}$/.test(draftCode)) { setError('Code must be exactly 4 digits'); return; }
+    const { error } = await supabase.from('identity_codes').insert({
+      identity_id: identityId, code: draftCode, label: draftLabel || null,
+    });
+    if (error) { setError(error.message); return; }
+    setDraftCode('');
+    setDraftLabel('');
+    setAdding(false);
+    await load();
+  }
+
+  async function revokeCode(id: string) {
+    await supabase.from('identity_codes').update({ is_active: false, revoked_at: new Date().toISOString() }).eq('id', id);
+    await load();
+  }
+
+  async function deleteCode(id: string) {
+    await supabase.from('identity_codes').delete().eq('id', id);
+    await load();
+  }
+
+  const active = codes.filter((c) => c.is_active);
+  const revoked = codes.filter((c) => !c.is_active);
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #22305e' }}>
+      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
+        Recipient codes ({active.length})
+      </p>
+      <p style={{ fontSize: 11, color: '#5c6588', marginBottom: 10 }}>
+        Give a separate code to each person instead of sharing your main one — revoking it later won&apos;t affect anyone else.
+      </p>
+      {active.map((c) => (
+        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12 }}>
+          <div>
+            <span style={{ fontFamily: 'monospace', color: '#5AA7FF' }}>{c.code}</span>
+            <span style={{ marginLeft: 8, color: '#F2EEE6' }}>{c.label || 'Unlabeled'}</span>
+            {c.last_used_at && <span style={{ marginLeft: 8, fontSize: 10.5, color: '#5c6588' }}>used {new Date(c.last_used_at).toLocaleDateString()}</span>}
+          </div>
+          <Button variant="danger" onClick={() => revokeCode(c.id)}>Revoke</Button>
+        </div>
+      ))}
+      {revoked.length > 0 && (
+        <details style={{ marginTop: 8 }}>
+          <summary style={{ fontSize: 11, color: '#5c6588', cursor: 'pointer' }}>{revoked.length} revoked</summary>
+          {revoked.map((c) => (
+            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 11, color: '#5c6588' }}>
+              <span>{c.code} — {c.label || 'Unlabeled'} (revoked {c.revoked_at ? new Date(c.revoked_at).toLocaleDateString() : ''})</span>
+              <Button variant="ghost" onClick={() => deleteCode(c.id)}>Delete</Button>
+            </div>
+          ))}
+        </details>
+      )}
+      {adding ? (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <input
+            placeholder="4-digit code"
+            value={draftCode}
+            onChange={(e) => setDraftCode(e.target.value)}
+            maxLength={4}
+            style={{ width: 90, padding: 8, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
+          />
+          <input
+            placeholder="Label (e.g. Maria - Northgate)"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
+          />
+          <Button onClick={addCode} style={{ fontSize: 12, padding: '8px 12px' }}>Add</Button>
+          <Button variant="secondary" onClick={() => { setAdding(false); setError(null); }} style={{ fontSize: 12, padding: '8px 12px' }}>Cancel</Button>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} style={{ marginTop: 8, background: 'none', border: '1px dashed #22305e', color: '#5AA7FF', fontSize: 11, padding: 7, borderRadius: 8, width: '100%', cursor: 'pointer' }}>
+          + Give someone their own code
+        </button>
+      )}
+      {error && <p style={{ color: '#e07a63', fontSize: 11, marginTop: 4 }}>{error}</p>}
     </div>
   );
 }
@@ -589,7 +700,8 @@ export default function Dashboard() {
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <Logo size={30} wordmarkSize={18} />
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <a href="/company-dashboard" style={{ color: '#5AA7FF', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Manage a company →</a>
             <Button variant="ghost" onClick={downloadMyData}>Download my data</Button>
             <Button variant="ghost" onClick={logout}>Log out</Button>
           </div>
@@ -636,6 +748,7 @@ export default function Dashboard() {
               </div>
             </div>
             <CredentialsSection identityId={id.id} />
+            <RecipientCodesSection identityId={id.id} />
             <GrantsSection identityId={id.id} />
             <AccessLogSection identityId={id.id} />
           </div>
