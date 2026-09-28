@@ -817,6 +817,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <Logo size={30} wordmarkSize={18} />
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <a href="/firefly" style={{ color: '#F5D76E', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Firefly</a>
             <a href="/company-dashboard" style={{ color: '#5AA7FF', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Manage a company →</a>
             <Button variant="ghost" onClick={downloadMyData}>Download my data</Button>
             <Button variant="ghost" onClick={logout}>Log out</Button>
