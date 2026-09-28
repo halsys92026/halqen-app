@@ -176,6 +176,119 @@ function EmployeeCredentialsSection({ employeeId }: { employeeId: string }) {
   );
 }
 
+type CardToken = {
+  id: string;
+  token: string;
+  label: string | null;
+  is_active: boolean;
+  revoked_at: string | null;
+  last_used_at: string | null;
+};
+
+function EmployeeCardTokensSection({ employeeId }: { employeeId: string }) {
+  const [cards, setCards] = useState<CardToken[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [draftLabel, setDraftLabel] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { load(); }, [employeeId]);
+
+  async function load() {
+    const { data } = await supabase.from('card_tokens').select('*').eq('employee_id', employeeId).order('created_at', { ascending: false });
+    if (data) setCards(data as CardToken[]);
+  }
+
+  function cardUrl(token: string) {
+    return `https://halqen.com/v/${token}`;
+  }
+
+  async function copyUrl(card: CardToken) {
+    try {
+      await navigator.clipboard.writeText(cardUrl(card.token));
+      setCopiedId(card.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      // Clipboard access can be blocked in some browser contexts — silently no-op
+    }
+  }
+
+  async function addCard() {
+    setError(null);
+    const { error } = await supabase.from('card_tokens').insert({
+      employee_id: employeeId, label: draftLabel || null,
+    });
+    if (error) { setError(error.message); return; }
+    setDraftLabel('');
+    setAdding(false);
+    await load();
+  }
+
+  async function revokeCard(id: string) {
+    await supabase.from('card_tokens').update({ is_active: false, revoked_at: new Date().toISOString() }).eq('id', id);
+    await load();
+  }
+
+  async function deleteCard(id: string) {
+    await supabase.from('card_tokens').delete().eq('id', id);
+    await load();
+  }
+
+  const active = cards.filter((c) => c.is_active);
+  const revoked = cards.filter((c) => !c.is_active);
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #22305e' }}>
+      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
+        NFC cards ({active.length})
+      </p>
+      {active.map((c) => (
+        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12, gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <span style={{ color: '#F2EEE6' }}>{c.label || 'Unlabeled card'}</span>
+            {c.last_used_at && <span style={{ marginLeft: 8, fontSize: 10.5, color: '#5c6588' }}>tapped {new Date(c.last_used_at).toLocaleDateString()}</span>}
+            <div style={{ fontFamily: 'monospace', fontSize: 10.5, color: '#5AA7FF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {cardUrl(c.token)}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+            <Button variant="ghost" onClick={() => copyUrl(c)}>{copiedId === c.id ? 'Copied' : 'Copy link'}</Button>
+            <Button variant="danger" onClick={() => revokeCard(c.id)}>Revoke</Button>
+          </div>
+        </div>
+      ))}
+      {revoked.length > 0 && (
+        <details style={{ marginTop: 8 }}>
+          <summary style={{ fontSize: 11, color: '#5c6588', cursor: 'pointer' }}>{revoked.length} revoked</summary>
+          {revoked.map((c) => (
+            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 11, color: '#5c6588' }}>
+              <span>{c.label || 'Unlabeled card'} (revoked {c.revoked_at ? new Date(c.revoked_at).toLocaleDateString() : ''})</span>
+              <Button variant="ghost" onClick={() => deleteCard(c.id)}>Delete</Button>
+            </div>
+          ))}
+        </details>
+      )}
+      {adding ? (
+        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <input
+            placeholder="Label (e.g. Wallet card, Spare)"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value)}
+            style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
+          />
+          <Button onClick={addCard} style={{ fontSize: 12, padding: '8px 12px' }}>Add</Button>
+          <Button variant="secondary" onClick={() => { setAdding(false); setError(null); }} style={{ fontSize: 12, padding: '8px 12px' }}>Cancel</Button>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)} style={{ marginTop: 8, background: 'none', border: '1px dashed #22305e', color: '#5AA7FF', fontSize: 11, padding: 7, borderRadius: 8, width: '100%', cursor: 'pointer' }}>
+          + Add a card
+        </button>
+      )}
+      {error && <p style={{ color: '#e07a63', fontSize: 11, marginTop: 4 }}>{error}</p>}
+    </div>
+  );
+}
+
 export default function CompanyDashboard() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
@@ -326,6 +439,7 @@ export default function CompanyDashboard() {
                   </div>
                 </div>
                 <EmployeeCredentialsSection employeeId={emp.id} />
+                <EmployeeCardTokensSection employeeId={emp.id} />
               </div>
             ))}
 
