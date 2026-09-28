@@ -28,6 +28,12 @@ create index if not exists card_tokens_employee_id_idx on public.card_tokens(emp
 
 alter table public.card_tokens enable row level security;
 
+-- RLS policies only take effect on top of a base GRANT — without this,
+-- Postgres blocks access before the policies below are ever evaluated,
+-- producing "permission denied for table card_tokens" for every logged-in
+-- user regardless of ownership.
+grant select, insert, update, delete on public.card_tokens to authenticated;
+
 -- An identity owner manages card tokens for their own identities only.
 drop policy if exists owner_manages_own_identity_card_tokens on public.card_tokens;
 create policy owner_manages_own_identity_card_tokens
