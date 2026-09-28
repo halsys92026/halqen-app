@@ -323,7 +323,6 @@ type RecipientCode = {
 function RecipientCodesSection({ identityId }: { identityId: string }) {
   const [codes, setCodes] = useState<RecipientCode[]>([]);
   const [adding, setAdding] = useState(false);
-  const [draftCode, setDraftCode] = useState('');
   const [draftLabel, setDraftLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -336,12 +335,12 @@ function RecipientCodesSection({ identityId }: { identityId: string }) {
 
   async function addCode() {
     setError(null);
-    if (!/^\d{4}$/.test(draftCode)) { setError('Code must be exactly 4 digits'); return; }
+    const { data: generated, error: genError } = await supabase.rpc('generate_unique_access_code');
+    if (genError || !generated) { setError(genError?.message || 'Could not generate a code'); return; }
     const { error } = await supabase.from('identity_codes').insert({
-      identity_id: identityId, code: draftCode, label: draftLabel || null,
+      identity_id: identityId, code: generated, label: draftLabel || null,
     });
     if (error) { setError(error.message); return; }
-    setDraftCode('');
     setDraftLabel('');
     setAdding(false);
     await load();
@@ -392,19 +391,12 @@ function RecipientCodesSection({ identityId }: { identityId: string }) {
       {adding ? (
         <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
           <input
-            placeholder="4-digit code"
-            value={draftCode}
-            onChange={(e) => setDraftCode(e.target.value)}
-            maxLength={4}
-            style={{ width: 90, padding: 8, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
-          />
-          <input
             placeholder="Label (e.g. Maria - Northgate)"
             value={draftLabel}
             onChange={(e) => setDraftLabel(e.target.value)}
             style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
           />
-          <Button onClick={addCode} style={{ fontSize: 12, padding: '8px 12px' }}>Add</Button>
+          <Button onClick={addCode} style={{ fontSize: 12, padding: '8px 12px' }}>Generate &amp; add</Button>
           <Button variant="secondary" onClick={() => { setAdding(false); setError(null); }} style={{ fontSize: 12, padding: '8px 12px' }}>Cancel</Button>
         </div>
       ) : (
@@ -656,6 +648,7 @@ export default function Dashboard() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -680,6 +673,18 @@ export default function Dashboard() {
   async function loadIdentities() {
     const { data } = await supabase.from('identities').select('*').order('created_at');
     if (data) setIdentities(data as Identity[]);
+  }
+
+  async function startNewIdentity() {
+    setSaveError(null);
+    setGeneratingCode(true);
+    const { data, error } = await supabase.rpc('generate_unique_access_code');
+    setGeneratingCode(false);
+    if (error || !data) {
+      setSaveError(error?.message || 'Could not generate an access code. Please try again.');
+      return;
+    }
+    setEditing({ ...BLANK, code: data as string });
   }
 
   function photoPathFromUrl(url: string): string | null {
@@ -739,8 +744,8 @@ export default function Dashboard() {
     if (!editing) return;
     setSaveError(null);
 
-    if (!/^\d{4}$/.test(editing.code)) {
-      setSaveError('Code must be exactly 4 digits');
+    if (!/^\d{6}$/.test(editing.code)) {
+      setSaveError('Code must be exactly 6 digits');
       return;
     }
 
@@ -875,10 +880,11 @@ export default function Dashboard() {
           <Button
             variant="secondary"
             full
-            onClick={() => setEditing({ ...BLANK })}
+            onClick={startNewIdentity}
+            disabled={generatingCode}
             style={{ borderStyle: 'dashed', color: '#5AA7FF' }}
           >
-            + Add identity
+            {generatingCode ? <Spinner size={14} /> : '+ Add identity'}
           </Button>
         )}
 
@@ -919,9 +925,18 @@ export default function Dashboard() {
             </div>
             {uploadError && <p style={{ color: '#e07a63', fontSize: 12, marginBottom: 12 }}>{uploadError}</p>}
 
+            <div style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>
+                Access code
+              </p>
+              <span style={{ fontFamily: 'monospace', fontSize: 16, color: '#5AA7FF', background: 'rgba(90,167,255,0.1)', padding: '5px 12px', borderRadius: 8 }}>
+                {editing.code || '······'}
+              </span>
+              <span style={{ marginLeft: 10, fontSize: 11, color: '#5c6588' }}>Assigned automatically — can&apos;t be changed</span>
+            </div>
+
             {(
               [
-                ['code', 'Code (4 digits)'],
                 ['business', 'Business name'],
                 ['display_name', 'Your name'],
                 ['title', 'Title'],
