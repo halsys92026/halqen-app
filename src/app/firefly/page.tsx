@@ -162,8 +162,14 @@ function friendlyError(message: string) {
   return message.replace(/^.*?ERROR:\s*/, '');
 }
 
+// Limited to formats every browser can actually display in an <img> tag --
+// notably excludes TIFF and other formats that count as "image/*" but that
+// browsers cannot render, which would otherwise upload fine and then show
+// nothing.
+const RENDERABLE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
 async function uploadPingPhoto(file: File, uid: string): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file');
+  if (!RENDERABLE_IMAGE_TYPES.includes(file.type)) throw new Error('Please choose a JPG, PNG, WEBP or GIF image');
   if (file.size > 5 * 1024 * 1024) throw new Error('Image must be under 5MB');
   const ext = file.name.split('.').pop() || 'jpg';
   const path = `${uid}/${Date.now()}.${ext}`;
@@ -482,7 +488,7 @@ function NeedHelpTab({ userId }: { userId: string }) {
         <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Photo (optional)</label>
         <input
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif"
           onChange={(e) => setPhoto(e.target.files?.[0] || null)}
           style={{ ...muted, marginBottom: 14, display: 'block' }}
         />
@@ -938,7 +944,7 @@ function HistoryTab({ userId }: { userId: string }) {
                 onChange={(e) => setAgainNote(e.target.value)}
                 style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontFamily: 'inherit', fontSize: 13, resize: 'vertical' }}
               />
-              <input type="file" accept="image/*" onChange={(e) => setAgainPhoto(e.target.files?.[0] || null)} style={{ ...muted, marginBottom: 10, display: 'block' }} />
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => setAgainPhoto(e.target.files?.[0] || null)} style={{ ...muted, marginBottom: 10, display: 'block' }} />
               {error && <p style={{ fontSize: 12, color: '#e07a63', marginBottom: 8 }}>{error}</p>}
               {againStatus && <p style={{ fontSize: 12, color: '#5FAE8F', marginBottom: 8 }}>{againStatus}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
