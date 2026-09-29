@@ -164,7 +164,12 @@ export default function ClientDashboard() {
       <div style={{ maxWidth: 640, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <Logo size={30} wordmarkSize={18} />
-          {client && <Button variant="ghost" onClick={logout}>Log out</Button>}
+          {client && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <a href="/firefly" style={{ color: '#F5D76E', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Firefly</a>
+              <Button variant="ghost" onClick={logout}>Log out</Button>
+            </div>
+          )}
         </div>
 
         {!client ? (

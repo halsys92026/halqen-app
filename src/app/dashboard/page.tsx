@@ -667,7 +667,11 @@ export default function Dashboard() {
   async function recordConsentIfNeeded(uid: string) {
     const { data: existing } = await supabase.from('consents').select('id').eq('user_id', uid).limit(1);
     if (existing && existing.length > 0) return;
-    await supabase.from('consents').insert({ user_id: uid, terms_version: '2026-09', account_type: 'contractor' });
+    // Halqen is no longer contractor-only — this dashboard now serves property
+    // managers, homeowners, landlords, businesses, agents, and contractors alike.
+    // 'other' matches the same catch-all default used by Firefly's own
+    // user_type field, since we don't collect a specific account type at signup.
+    await supabase.from('consents').insert({ user_id: uid, terms_version: '2026-09', account_type: 'other' });
   }
 
   async function loadIdentities() {
@@ -822,6 +826,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <Logo size={30} wordmarkSize={18} />
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <a href="/firefly" style={{ color: '#F5D76E', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Firefly</a>
             <a href="/company-dashboard" style={{ color: '#5AA7FF', fontSize: 13, textDecoration: 'none', marginRight: 8 }}>Manage a company →</a>
             <Button variant="ghost" onClick={downloadMyData}>Download my data</Button>
             <Button variant="ghost" onClick={logout}>Log out</Button>
