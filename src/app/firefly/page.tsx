@@ -1008,7 +1008,41 @@ function HistoryTab({ userId }: { userId: string }) {
 
 // ------------------------------------------------------------------ page
 
+// Flip to true once there's a real provider pool in a given area to make
+// Firefly usable. Until then the nav link stays visible everywhere it
+// already is, but the page itself shows a "coming soon" placeholder instead
+// of the working profile/ping/availability/history UI.
+const FIREFLY_LAUNCHED = false;
+
 type Tab = 'help' | 'available' | 'history';
+
+function FireflyComingSoon() {
+  return (
+    <div style={{ background: 'radial-gradient(circle at 20% 0%, #16204f 0%, #0A1330 45%)', minHeight: '100vh', color: '#F2EEE6', fontFamily: 'Inter, sans-serif', padding: 24 }}>
+      <div style={{ maxWidth: 560, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+          <Logo size={30} wordmarkSize={18} />
+          <a href="/dashboard" style={{ color: '#8B93B8', fontSize: 13, textDecoration: 'none' }}>← Dashboard</a>
+        </div>
+        <h1 style={{ fontSize: 24, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+          Firefly <span style={{ color: '#F5D76E', textShadow: '0 0 10px rgba(245,215,110,0.6)' }}>•</span>
+        </h1>
+        <p style={{ fontSize: 13, color: '#8B93B8', marginBottom: 28, letterSpacing: '0.04em' }}>Ping. Verify. Connect.</p>
+
+        <div style={{ background: '#111a3f', border: '1px solid #22305e', borderRadius: 14, padding: '32px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
+          <h2 style={{ fontSize: 18, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, marginBottom: 10 }}>
+            Coming soon
+          </h2>
+          <p style={{ fontSize: 14, color: '#C7CCE6', lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>
+            Firefly connects you with nearby service providers in real time. We&apos;re building up a
+            network of verified providers in your area before turning this on — check back soon.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function FireflyPage() {
   const router = useRouter();
@@ -1028,14 +1062,17 @@ export default function FireflyPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
       setUserId(session.user.id);
-      const { data: ids } = await supabase.from('identities').select('id, business, display_name, is_active').order('created_at');
-      if (ids) setIdentities(ids as Identity[]);
-      await loadProfile();
+      if (FIREFLY_LAUNCHED) {
+        const { data: ids } = await supabase.from('identities').select('id, business, display_name, is_active').order('created_at');
+        if (ids) setIdentities(ids as Identity[]);
+        await loadProfile();
+      }
       setLoading(false);
     })();
   }, [router, loadProfile]);
 
   if (loading) return <LoadingScreen label="Loading Firefly…" />;
+  if (!FIREFLY_LAUNCHED) return <FireflyComingSoon />;
 
   const isProvider = !!profile?.provider_identity_id;
   const tabs: { key: Tab; label: string }[] = [
