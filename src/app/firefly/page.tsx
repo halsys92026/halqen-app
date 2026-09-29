@@ -178,21 +178,35 @@ async function uploadPingPhoto(file: File, uid: string): Promise<string> {
   return path;
 }
 
-async function getSignedPhotoUrl(path: string): Promise<string | null> {
-  const { data } = await supabase.storage.from('firefly-ping-photos').createSignedUrl(path, 600);
-  return data?.signedUrl || null;
+async function getSignedPhotoUrl(path: string): Promise<{ url: string | null; error: string | null }> {
+  const { data, error } = await supabase.storage.from('firefly-ping-photos').createSignedUrl(path, 600);
+  if (error) return { url: null, error: error.message };
+  if (!data?.signedUrl) return { url: null, error: 'No signed URL returned' };
+  return { url: data.signedUrl, error: null };
 }
 
 function PhotoThumb({ path }: { path: string }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => {
     let alive = true;
-    getSignedPhotoUrl(path).then((u) => { if (alive) setUrl(u); });
+    getSignedPhotoUrl(path).then((r) => {
+      if (!alive) return;
+      setUrl(r.url);
+      setError(r.error);
+    });
     return () => { alive = false; };
   }, [path]);
+  if (error) {
+    return <p style={{ fontSize: 11, color: '#e07a63', marginTop: 8 }}>Photo failed to load: {error}</p>;
+  }
   if (!url) return null;
+  if (imgFailed) {
+    return <p style={{ fontSize: 11, color: '#e07a63', marginTop: 8 }}>Photo link resolved but the image itself would not load.</p>;
+  }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt="Photo from the ping" style={{ width: '100%', maxWidth: 260, borderRadius: 10, marginTop: 10, display: 'block' }} />;
+  return <img src={url} alt="Photo from the ping" onError={() => setImgFailed(true)} style={{ width: '100%', maxWidth: 260, borderRadius: 10, marginTop: 10, display: 'block' }} />;
 }
 
 // Shared across tabs: the caller's saved locations, for picking instead of
