@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const code = body?.code;
 
-  if (!code || typeof code !== 'string' || !/^\d{4}$/.test(code)) {
+  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
     return NextResponse.json({ error: 'Invalid code format' }, { status: 400 });
   }
 

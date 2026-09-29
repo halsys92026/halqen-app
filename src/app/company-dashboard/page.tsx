@@ -299,6 +299,7 @@ export default function CompanyDashboard() {
   const [editing, setEditing] = useState<Employee | (Omit<Employee, 'id'> & { id?: undefined }) | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   async function loadEmployees(companyId: string) {
     const { data } = await supabase.from('employees').select('*').eq('company_id', companyId).order('created_at');
@@ -336,6 +337,18 @@ export default function CompanyDashboard() {
     return idx === -1 ? null : url.slice(idx + marker.length);
   }
 
+  async function startNewEmployee() {
+    setSaveError(null);
+    setGeneratingCode(true);
+    const { data, error } = await supabase.rpc('generate_unique_access_code');
+    setGeneratingCode(false);
+    if (error || !data) {
+      setSaveError(error?.message || 'Could not generate an access code. Please try again.');
+      return;
+    }
+    setEditing({ ...BLANK_EMPLOYEE, code: data as string });
+  }
+
   async function uploadPhoto(file: File) {
     if (!userId || !editing) return;
     if (!file.type.startsWith('image/')) { setSaveError('Please choose an image file'); return; }
@@ -355,7 +368,7 @@ export default function CompanyDashboard() {
   async function save() {
     if (!editing || !company) return;
     setSaveError(null);
-    if (!/^\d{4}$/.test(editing.code)) { setSaveError('Code must be exactly 4 digits'); return; }
+    if (!/^\d{6}$/.test(editing.code)) { setSaveError('Code must be exactly 6 digits'); return; }
 
     if ('id' in editing && editing.id) {
       const { error } = await supabase.from('employees').update(editing).eq('id', editing.id);
@@ -444,8 +457,8 @@ export default function CompanyDashboard() {
             ))}
 
             {!editing && (
-              <Button variant="secondary" full onClick={() => setEditing({ ...BLANK_EMPLOYEE })} style={{ borderStyle: 'dashed', color: '#5AA7FF' }}>
-                + Add employee
+              <Button variant="secondary" full onClick={startNewEmployee} disabled={generatingCode} style={{ borderStyle: 'dashed', color: '#5AA7FF' }}>
+                {generatingCode ? <Spinner size={14} /> : '+ Add employee'}
               </Button>
             )}
 
@@ -472,8 +485,18 @@ export default function CompanyDashboard() {
                   </label>
                 </div>
 
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>
+                    Access code
+                  </p>
+                  <span style={{ fontFamily: 'monospace', fontSize: 16, color: '#5AA7FF', background: 'rgba(90,167,255,0.1)', padding: '5px 12px', borderRadius: 8 }}>
+                    {editing.code || '······'}
+                  </span>
+                  <span style={{ marginLeft: 10, fontSize: 11, color: '#5c6588' }}>Assigned automatically — can&apos;t be changed</span>
+                </div>
+
                 {([
-                  ['code', 'Code (4 digits)'], ['name', 'Employee name'], ['role', 'Role'], ['phone', 'Phone'], ['email', 'Email'],
+                  ['name', 'Employee name'], ['role', 'Role'], ['phone', 'Phone'], ['email', 'Email'],
                 ] as [keyof typeof BLANK_EMPLOYEE, string][]).map(([field, label]) => (
                   <Input key={field} placeholder={label} value={editing[field] as string || ''} onChange={(e) => setEditing({ ...editing, [field]: e.target.value })} />
                 ))}
