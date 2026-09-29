@@ -7,25 +7,25 @@
 -- both the collision problem ("1000" already taken) and any incentive to
 -- pick guessable codes.
 --
--- Run this once in the Supabase SQL editor for the halqen.com project,
--- AFTER reviewing the notes below.
+-- Already run once in the Supabase SQL editor for the halqen.com project
+-- (2026-09-29). Kept here as the record of what changed and for any future
+-- environment that needs to apply the same schema.
 --
--- IMPORTANT — please read before running:
--- This session doesn't have direct database credentials, so the exact
--- existing constraints on identities.code / identity_codes.code /
--- employees.code (all three currently enforce 4-digit codes, and at least
--- identities.code is known to already carry a unique constraint named
--- "unique_code_global" from the "duplicate key" error hit during NFC
--- testing) could not be inspected directly. This migration is written
--- defensively as a result:
---   - It only ADDS indexes (via "if not exists") and never drops or alters
---     an existing constraint, so it's safe to run even if some of these
---     already exist in a different form.
---   - It's possible the current "global" uniqueness is enforced by a
---     mechanism spanning all three tables together (rather than one
---     constraint per table). If so, some redundancy here is expected and
---     harmless. Worth confirming together once you're back — this is
---     flagged, not silently assumed away.
+-- NOTE: the first attempt at this migration failed with:
+--   ERROR: 23514: new row for relation "identities" violates check
+--   constraint "code_is_4_digits"
+-- confirming there was a pre-existing CHECK constraint enforcing exactly 4
+-- digits on identities.code (and, by the same convention, presumably
+-- identity_codes.code and employees.code) that this session had no way to
+-- see ahead of time (no direct database credentials). The corrected version
+-- below drops that constraint before the backfill and re-adds a 6-digit
+-- version of it afterward.
+
+-- Drop the old 4-digit check constraints (if present under this name on
+-- each table) so the code column can hold 6-digit values.
+alter table public.identities drop constraint if exists code_is_4_digits;
+alter table public.identity_codes drop constraint if exists code_is_4_digits;
+alter table public.employees drop constraint if exists code_is_4_digits;
 
 -- Ensure each code column is independently unique (idempotent — if a
 -- constraint already covers this, this just adds a second, harmless index).
@@ -42,6 +42,11 @@ create unique index if not exists employees_code_unique_idx on public.employees(
 update public.identities set code = lpad(code, 6, '0') where length(code) = 4;
 update public.identity_codes set code = lpad(code, 6, '0') where length(code) = 4;
 update public.employees set code = lpad(code, 6, '0') where length(code) = 4;
+
+-- Re-add the check constraint, now requiring exactly 6 digits.
+alter table public.identities add constraint code_is_6_digits check (code ~ '^[0-9]{6}$');
+alter table public.identity_codes add constraint code_is_6_digits check (code ~ '^[0-9]{6}$');
+alter table public.employees add constraint code_is_6_digits check (code ~ '^[0-9]{6}$');
 
 -- Generates a random 6-digit code (000000-999999, zero-padded) and retries
 -- until it finds one not already in use anywhere in the system. Runs as
