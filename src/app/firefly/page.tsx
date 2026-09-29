@@ -56,6 +56,7 @@ type Profile = {
   provider_identity_id: string | null;
   services: string[];
   available_until: string | null;
+  schedule_active: boolean;
 };
 
 type Identity = { id: string; business: string; display_name: string; is_active: boolean };
@@ -64,8 +65,10 @@ type InboxPing = {
   ping_id: string;
   service: string;
   requester_type: string;
-  distance_km: number;
+  requester_label: string | null;
+  distance_km: number | null;
   note: string | null;
+  photo_path: string | null;
   expires_at: string;
 };
 
@@ -81,8 +84,36 @@ type MyPingRow = {
   phone: string | null;
   email: string | null;
   photo_url: string | null;
+  photo_path: string | null;
   verified: string[] | null;
 };
+
+type SavedLocation = { id: string; label: string; lat: number; lng: number };
+
+type ScheduleWindow = {
+  id: string;
+  day_of_week: number;
+  start_minute: number;
+  end_minute: number;
+  location_id: string;
+  location_label: string;
+  enabled: boolean;
+};
+
+const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function minuteToTime(m: number) {
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(mm).padStart(2, '0')} ${ampm}`;
+}
+
+function timeToMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
 
 type Connection = {
   connection_id: string;
@@ -129,6 +160,55 @@ function getLocation(): Promise<{ lat: number; lng: number }> {
 function friendlyError(message: string) {
   // Postgres exceptions raised in the Firefly functions are already user-facing
   return message.replace(/^.*?ERROR:\s*/, '');
+}
+
+async function uploadPingPhoto(file: File, uid: string): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file');
+  if (file.size > 5 * 1024 * 1024) throw new Error('Image must be under 5MB');
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `${uid}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from('firefly-ping-photos').upload(path, file);
+  if (error) throw new Error(error.message);
+  return path;
+}
+
+async function getSignedPhotoUrl(path: string): Promise<string | null> {
+  const { data } = await supabase.storage.from('firefly-ping-photos').createSignedUrl(path, 600);
+  return data?.signedUrl || null;
+}
+
+function PhotoThumb({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getSignedPhotoUrl(path).then((u) => { if (alive) setUrl(u); });
+    return () => { alive = false; };
+  }, [path]);
+  if (!url) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="Photo from the ping" style={{ width: '100%', maxWidth: 260, borderRadius: 10, marginTop: 10, display: 'block' }} />;
+}
+
+// Shared across tabs: the caller's saved locations, for picking instead of
+// a live GPS lookup each time.
+function useSavedLocations() {
+  const [locations, setLocations] = useState<SavedLocation[]>([]);
+  const reload = useCallback(() => {
+    supabase.rpc('firefly_list_locations').then(({ data }) => {
+      if (data) setLocations(data as SavedLocation[]);
+    });
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  async function addLocation(label: string, lat: number, lng: number) {
+    await supabase.rpc('firefly_save_location', { p_label: label, p_lat: lat, p_lng: lng });
+    reload();
+  }
+  async function removeLocation(id: string) {
+    await supabase.rpc('firefly_delete_location', { p_id: id });
+    reload();
+  }
+  return { locations, addLocation, removeLocation, reload };
 }
 
 // ------------------------------------------------------------------ profile
@@ -271,7 +351,7 @@ function ProfileSection({ profile, identities, onSaved }: {
 
 // ------------------------------------------------------------------ need help (requester)
 
-function NeedHelpTab() {
+function NeedHelpTab({ userId }: { userId: string }) {
   const [service, setService] = useState('plumbing');
   const [radius, setRadius] = useState(15);
   const [note, setNote] = useState('');
@@ -279,6 +359,11 @@ function NeedHelpTab() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<MyPingRow[]>([]);
+  const [locationId, setLocationId] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [newLocationLabel, setNewLocationLabel] = useState('');
+  const { locations, addLocation, removeLocation } = useSavedLocations();
 
   const [tick, setTick] = useState(0);
   const load = () => setTick((n) => n + 1);
@@ -293,19 +378,41 @@ function NeedHelpTab() {
     return () => { alive = false; clearInterval(t); };
   }, [tick]);
 
+  async function saveCurrentLocation() {
+    if (!newLocationLabel.trim()) { setError('Give this location a name first, e.g. "Main office".'); return; }
+    setSavingLocation(true); setError(null);
+    try {
+      const { lat, lng } = await getLocation();
+      await addLocation(newLocationLabel.trim(), lat, lng);
+      setNewLocationLabel('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save that location.');
+    }
+    setSavingLocation(false);
+  }
+
   async function send() {
     setError(null); setStatus(null); setSending(true);
     try {
-      const { lat, lng } = await getLocation();
+      let lat: number, lng: number;
+      if (locationId) {
+        const loc = locations.find((l) => l.id === locationId);
+        if (!loc) throw new Error('That saved location is gone. Pick another or use your current location.');
+        lat = loc.lat; lng = loc.lng;
+      } else {
+        ({ lat, lng } = await getLocation());
+      }
+      let photoPath: string | null = null;
+      if (photo) photoPath = await uploadPingPhoto(photo, userId);
       const { data, error: err } = await supabase.rpc('firefly_send_ping', {
-        p_service: service, p_lat: lat, p_lng: lng, p_radius_km: radius, p_note: note,
+        p_service: service, p_lat: lat, p_lng: lng, p_radius_km: radius, p_note: note, p_photo_path: photoPath,
       });
       if (err) throw new Error(friendlyError(err.message));
       const n = (data as { recipients: number }[])?.[0]?.recipients ?? 0;
       setStatus(n === 0
         ? 'Ping sent, but no verified providers for that service are available nearby right now. Try a wider radius or check back soon.'
         : `Ping sent to ${n} available provider${n === 1 ? '' : 's'}. Answers show up below; the ping closes in 30 minutes.`);
-      setNote('');
+      setNote(''); setPhoto(null);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -319,10 +426,10 @@ function NeedHelpTab() {
   }
 
   // Group rows (one per answer) back into pings
-  const pings: { ping_id: string; service: string; created_at: string; expires_at: string; is_open: boolean; answers: MyPingRow[] }[] = [];
+  const pings: { ping_id: string; service: string; created_at: string; expires_at: string; is_open: boolean; photo_path: string | null; answers: MyPingRow[] }[] = [];
   for (const r of rows) {
     let p = pings.find((x) => x.ping_id === r.ping_id);
-    if (!p) { p = { ping_id: r.ping_id, service: r.service, created_at: r.created_at, expires_at: r.expires_at, is_open: r.is_open, answers: [] }; pings.push(p); }
+    if (!p) { p = { ping_id: r.ping_id, service: r.service, created_at: r.created_at, expires_at: r.expires_at, is_open: r.is_open, photo_path: r.photo_path, answers: [] }; pings.push(p); }
     if (r.connection_id) p.answers.push(r);
   }
 
@@ -336,12 +443,48 @@ function NeedHelpTab() {
         </select>
         <label style={{ ...muted, display: 'block', marginBottom: 6 }}>How far: {radius} km (about {Math.round(radius * 0.62)} miles)</label>
         <input type="range" min={2} max={80} value={radius} onChange={(e) => setRadius(Number(e.target.value))} style={{ width: '100%', marginBottom: 14 }} />
+
+        <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Where from</label>
+        <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={selectStyle}>
+          <option value="">Use my current location</option>
+          {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <input
+            placeholder="Save current location as… e.g. Main office"
+            value={newLocationLabel}
+            maxLength={60}
+            onChange={(e) => setNewLocationLabel(e.target.value)}
+            style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
+          />
+          <Button variant="ghost" onClick={saveCurrentLocation} disabled={savingLocation}>
+            {savingLocation ? 'Saving…' : 'Save'}
+          </Button>
+        </div>
+        {locations.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+            {locations.map((l) => (
+              <span key={l.id} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 999, background: 'rgba(139,147,184,0.12)', color: '#8B93B8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {l.label}
+                <button type="button" onClick={() => { removeLocation(l.id); if (locationId === l.id) setLocationId(''); }} style={{ background: 'none', border: 'none', color: '#8B93B8', cursor: 'pointer', fontSize: 11, padding: 0 }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+
         <Input
           label="Short note (optional, no addresses or names)"
           value={note}
           maxLength={140}
           placeholder="e.g. Water heater leaking"
           onChange={(e) => setNote(e.target.value)}
+        />
+        <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Photo (optional)</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+          style={{ ...muted, marginBottom: 14, display: 'block' }}
         />
         <Button full onClick={send} disabled={sending}>
           {sending && <Spinner size={14} />}
@@ -368,6 +511,7 @@ function NeedHelpTab() {
             </div>
             {p.is_open && <Button variant="ghost" onClick={() => closePing(p.ping_id)}>Close</Button>}
           </div>
+          {p.photo_path && <PhotoThumb path={p.photo_path} />}
           {p.answers.length === 0 && p.is_open && <p style={muted}>Waiting for an answer…</p>}
           {p.answers.map((a) => (
             <div key={a.connection_id} style={{ background: '#0A1330', border: '1px solid #22305e', borderRadius: 12, padding: 14, marginTop: 8 }}>
@@ -396,12 +540,16 @@ function NeedHelpTab() {
 
 // ------------------------------------------------------------------ available (provider)
 
-function AvailableTab({ availableUntil, onChange }: { availableUntil: string | null; onChange: () => void }) {
+function AvailableTab({ availableUntil, scheduleActive, onChange }: {
+  availableUntil: string | null; scheduleActive: boolean; onChange: () => void;
+}) {
   const [minutes, setMinutes] = useState(120);
+  const [locationId, setLocationId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inbox, setInbox] = useState<InboxPing[]>([]);
   const isAvailable = !!availableUntil && new Date(availableUntil) > new Date();
+  const { locations, addLocation, removeLocation } = useSavedLocations();
 
   const [tick, setTick] = useState(0);
   const load = () => setTick((n) => n + 1);
@@ -419,7 +567,14 @@ function AvailableTab({ availableUntil, onChange }: { availableUntil: string | n
   async function goAvailable() {
     setError(null); setBusy(true);
     try {
-      const { lat, lng } = await getLocation();
+      let lat: number, lng: number;
+      if (locationId) {
+        const loc = locations.find((l) => l.id === locationId);
+        if (!loc) throw new Error('That saved location is gone. Pick another or use your current location.');
+        lat = loc.lat; lng = loc.lng;
+      } else {
+        ({ lat, lng } = await getLocation());
+      }
       const { error: err } = await supabase.rpc('firefly_set_available', { p_lat: lat, p_lng: lng, p_minutes: minutes });
       if (err) throw new Error(friendlyError(err.message));
       onChange();
@@ -442,23 +597,37 @@ function AvailableTab({ availableUntil, onChange }: { availableUntil: string | n
     load();
   }
 
+  const showAsGlowing = isAvailable || scheduleActive;
+
   return (
     <>
-      <div style={{ ...card, borderColor: isAvailable ? '#5FAE8F' : '#22305e' }}>
+      <div style={{ ...card, borderColor: showAsGlowing ? '#5FAE8F' : '#22305e' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{
             width: 12, height: 12, borderRadius: '50%',
-            background: isAvailable ? '#F5D76E' : '#22305e',
-            boxShadow: isAvailable ? '0 0 12px 3px rgba(245,215,110,0.6)' : 'none',
+            background: showAsGlowing ? '#F5D76E' : '#22305e',
+            boxShadow: showAsGlowing ? '0 0 12px 3px rgba(245,215,110,0.6)' : 'none',
           }} />
           <h2 style={{ ...h2, marginBottom: 0 }}>
-            {isAvailable ? `You're glowing: available for ${minutesLeft(availableUntil!)} more min` : "You're offline"}
+            {isAvailable ? `You're glowing: available for ${minutesLeft(availableUntil!)} more min`
+              : scheduleActive ? "You're glowing via your recurring schedule"
+              : "You're offline"}
           </h2>
         </div>
         {isAvailable ? (
           <Button full variant="secondary" onClick={goOffline} disabled={busy}>Go offline now</Button>
         ) : (
           <>
+            {scheduleActive && (
+              <p style={{ ...muted, marginBottom: 10 }}>
+                A recurring schedule window is active right now, so you&rsquo;re already receiving pings. Manually going available adds extra time on top.
+              </p>
+            )}
+            <label style={{ ...muted, display: 'block', marginBottom: 6 }}>From</label>
+            <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={selectStyle}>
+              <option value="">Use my current location</option>
+              {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+            </select>
             <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Stay available for</label>
             <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} style={selectStyle}>
               <option value={30}>30 minutes</option>
@@ -479,15 +648,19 @@ function AvailableTab({ availableUntil, onChange }: { availableUntil: string | n
         {error && <p style={{ fontSize: 13, color: '#e07a63', marginTop: 10 }}>{error}</p>}
       </div>
 
+      <ScheduleSection locations={locations} onAddLocation={addLocation} onRemoveLocation={removeLocation} />
+
       <h2 style={{ ...h2, marginTop: 20 }}>Incoming pings</h2>
-      {inbox.length === 0 && <p style={muted}>{isAvailable ? 'Nothing right now. New pings appear here automatically.' : 'Go available to receive pings.'}</p>}
+      {inbox.length === 0 && <p style={muted}>{showAsGlowing ? 'Nothing right now. New pings appear here automatically.' : 'Go available to receive pings.'}</p>}
       {inbox.map((p) => (
         <div key={p.ping_id} style={card}>
           <p style={{ fontSize: 15, fontWeight: 600 }}>{serviceLabel(p.service)}</p>
           <p style={muted}>
-            {userTypeLabel(p.requester_type)} · about {p.distance_km} km away · closes in {minutesLeft(p.expires_at)} min
+            {p.requester_label ? <>{p.requester_label} (you&rsquo;ve connected before)</> : userTypeLabel(p.requester_type)}
+            {p.distance_km != null && <> · about {p.distance_km} km away</>} · closes in {minutesLeft(p.expires_at)} min
           </p>
           {p.note && <p style={{ fontSize: 13, marginTop: 8 }}>&ldquo;{p.note}&rdquo;</p>}
+          {p.photo_path && <PhotoThumb path={p.photo_path} />}
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <Button full onClick={() => respond(p.ping_id, true)}>I can help</Button>
             <Button full variant="secondary" onClick={() => respond(p.ping_id, false)}>Pass</Button>
@@ -501,14 +674,145 @@ function AvailableTab({ availableUntil, onChange }: { availableUntil: string | n
   );
 }
 
+// Recurring weekly availability windows, each tied to a saved location.
+function ScheduleSection({ locations, onAddLocation, onRemoveLocation }: {
+  locations: SavedLocation[];
+  onAddLocation: (label: string, lat: number, lng: number) => Promise<void>;
+  onRemoveLocation: (id: string) => Promise<void>;
+}) {
+  const [windows, setWindows] = useState<ScheduleWindow[]>([]);
+  const [day, setDay] = useState(1);
+  const [start, setStart] = useState('08:00');
+  const [end, setEnd] = useState('17:00');
+  const [locationId, setLocationId] = useState('');
+  const [newLocationLabel, setNewLocationLabel] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(() => {
+    supabase.rpc('firefly_list_schedule').then(({ data }) => {
+      if (data) setWindows(data as ScheduleWindow[]);
+    });
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  async function saveLocation() {
+    if (!newLocationLabel.trim()) { setError('Give this location a name first.'); return; }
+    setBusy(true); setError(null);
+    try {
+      const { lat, lng } = await getLocation();
+      await onAddLocation(newLocationLabel.trim(), lat, lng);
+      setNewLocationLabel('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save that location.');
+    }
+    setBusy(false);
+  }
+
+  async function addWindow() {
+    setError(null);
+    if (!locationId) { setError('Pick a location for this window first.'); return; }
+    const startMin = timeToMinutes(start);
+    const endMin = timeToMinutes(end);
+    if (endMin <= startMin) { setError('End time must be after start time.'); return; }
+    setBusy(true);
+    const { error: err } = await supabase.rpc('firefly_save_schedule_window', {
+      p_day_of_week: day, p_start_minute: startMin, p_end_minute: endMin, p_location_id: locationId,
+    });
+    setBusy(false);
+    if (err) { setError(friendlyError(err.message)); return; }
+    reload();
+  }
+
+  async function toggleWindow(id: string, enabled: boolean) {
+    await supabase.rpc('firefly_set_schedule_window_enabled', { p_id: id, p_enabled: enabled });
+    reload();
+  }
+
+  async function deleteWindow(id: string) {
+    await supabase.rpc('firefly_delete_schedule_window', { p_id: id });
+    reload();
+  }
+
+  return (
+    <div style={card}>
+      <h2 style={h2}>Recurring availability</h2>
+      <p style={{ ...muted, marginBottom: 12 }}>
+        Set weekly hours instead of remembering to toggle available each day. Times are in your local (Pacific) time.
+      </p>
+
+      {windows.length === 0 && <p style={{ ...muted, marginBottom: 12 }}>No recurring windows yet.</p>}
+      {windows.map((w) => (
+        <div key={w.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid #22305e' }}>
+          <div>
+            <p style={{ fontSize: 13, opacity: w.enabled ? 1 : 0.5 }}>
+              {DAY_LABELS[w.day_of_week]} · {minuteToTime(w.start_minute)}–{minuteToTime(w.end_minute)}
+            </p>
+            <p style={{ ...muted, opacity: w.enabled ? 1 : 0.5 }}>{w.location_label}</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="ghost" onClick={() => toggleWindow(w.id, !w.enabled)}>{w.enabled ? 'Pause' : 'Resume'}</Button>
+            <Button variant="ghost" onClick={() => deleteWindow(w.id)}>Delete</Button>
+          </div>
+        </div>
+      ))}
+
+      <div style={{ marginTop: 14, borderTop: '1px solid #22305e', paddingTop: 14 }}>
+        <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Add a window</label>
+        <select value={day} onChange={(e) => setDay(Number(e.target.value))} style={selectStyle}>
+          {DAY_LABELS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 13 }} />
+          <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 13 }} />
+        </div>
+        <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={selectStyle}>
+          <option value="">Choose a location…</option>
+          {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+        </select>
+        {locations.length === 0 && <p style={{ ...muted, marginBottom: 8 }}>No saved locations yet — add one below first.</p>}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            placeholder="Save current location as… e.g. Shop"
+            value={newLocationLabel}
+            maxLength={60}
+            onChange={(e) => setNewLocationLabel(e.target.value)}
+            style={{ flex: 1, padding: '9px 12px', borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 12 }}
+          />
+          <Button variant="ghost" onClick={saveLocation} disabled={busy}>Save</Button>
+        </div>
+        {locations.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            {locations.map((l) => (
+              <span key={l.id} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 999, background: 'rgba(139,147,184,0.12)', color: '#8B93B8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {l.label}
+                <button type="button" onClick={() => onRemoveLocation(l.id)} style={{ background: 'none', border: 'none', color: '#8B93B8', cursor: 'pointer', fontSize: 11, padding: 0 }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <Button full onClick={addWindow} disabled={busy}>Add window</Button>
+        {error && <p style={{ fontSize: 12, color: '#e07a63', marginTop: 8 }}>{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ history & blocks
 
-function HistoryTab() {
+function HistoryTab({ userId }: { userId: string }) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [blocking, setBlocking] = useState<Connection | null>(null);
   const [privateNote, setPrivateNote] = useState('');
+  const [pingingAgain, setPingingAgain] = useState<Connection | null>(null);
+  const [againNote, setAgainNote] = useState('');
+  const [againPhoto, setAgainPhoto] = useState<File | null>(null);
+  const [againLocationId, setAgainLocationId] = useState('');
+  const [againBusy, setAgainBusy] = useState(false);
+  const [againStatus, setAgainStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { locations } = useSavedLocations();
 
   const [tick, setTick] = useState(0);
   const load = () => setTick((n) => n + 1);
@@ -542,6 +846,32 @@ function HistoryTab() {
     load();
   }
 
+  async function sendPingAgain() {
+    if (!pingingAgain) return;
+    setAgainBusy(true); setError(null); setAgainStatus(null);
+    try {
+      let lat: number, lng: number;
+      if (againLocationId) {
+        const loc = locations.find((l) => l.id === againLocationId);
+        if (!loc) throw new Error('That saved location is gone. Pick another or use your current location.');
+        lat = loc.lat; lng = loc.lng;
+      } else {
+        ({ lat, lng } = await getLocation());
+      }
+      let photoPath: string | null = null;
+      if (againPhoto) photoPath = await uploadPingPhoto(againPhoto, userId);
+      const { error: err } = await supabase.rpc('firefly_ping_again', {
+        p_connection_id: pingingAgain.connection_id, p_lat: lat, p_lng: lng, p_note: againNote, p_photo_path: photoPath,
+      });
+      if (err) throw new Error(friendlyError(err.message));
+      setAgainStatus(`Pinged ${pingingAgain.other_label} directly. Check the Need help tab for their answer.`);
+      setAgainNote(''); setAgainPhoto(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong.');
+    }
+    setAgainBusy(false);
+  }
+
   return (
     <>
       <h2 style={h2}>Past connections (90 days)</h2>
@@ -559,9 +889,17 @@ function HistoryTab() {
                 {new Date(c.created_at).toLocaleDateString()}
               </p>
             </div>
-            {c.blocked
-              ? <span style={{ fontSize: 11, color: '#e07a63' }}>Blocked</span>
-              : <Button variant="danger" onClick={() => { setBlocking(c); setPrivateNote(''); setError(null); }}>Block</Button>}
+            {!c.blocked && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {c.my_role === 'requester' && (
+                  <Button variant="ghost" onClick={() => { setPingingAgain(c); setAgainNote(''); setAgainPhoto(null); setAgainLocationId(''); setAgainStatus(null); setError(null); }}>
+                    Ping again
+                  </Button>
+                )}
+                <Button variant="danger" onClick={() => { setBlocking(c); setPrivateNote(''); setError(null); }}>Block</Button>
+              </div>
+            )}
+            {c.blocked && <span style={{ fontSize: 11, color: '#e07a63' }}>Blocked</span>}
           </div>
           {blocking?.connection_id === c.connection_id && (
             <div style={{ marginTop: 14, borderTop: '1px solid #22305e', paddingTop: 14 }}>
@@ -580,6 +918,32 @@ function HistoryTab() {
               <div style={{ display: 'flex', gap: 10 }}>
                 <Button full onClick={confirmBlock} style={{ background: '#e07a63', boxShadow: 'none' }}>Block</Button>
                 <Button full variant="secondary" onClick={() => setBlocking(null)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+          {pingingAgain?.connection_id === c.connection_id && (
+            <div style={{ marginTop: 14, borderTop: '1px solid #22305e', paddingTop: 14 }}>
+              <p style={{ fontSize: 13, marginBottom: 10 }}>
+                Ping <strong>{c.other_label}</strong> directly for {serviceLabel(c.service)} — this goes straight to them, no radius matching needed since you&rsquo;ve already connected.
+              </p>
+              <select value={againLocationId} onChange={(e) => setAgainLocationId(e.target.value)} style={selectStyle}>
+                <option value="">Use my current location</option>
+                {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+              </select>
+              <textarea
+                placeholder="Short note (optional)"
+                value={againNote}
+                maxLength={140}
+                rows={2}
+                onChange={(e) => setAgainNote(e.target.value)}
+                style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontFamily: 'inherit', fontSize: 13, resize: 'vertical' }}
+              />
+              <input type="file" accept="image/*" onChange={(e) => setAgainPhoto(e.target.files?.[0] || null)} style={{ ...muted, marginBottom: 10, display: 'block' }} />
+              {error && <p style={{ fontSize: 12, color: '#e07a63', marginBottom: 8 }}>{error}</p>}
+              {againStatus && <p style={{ fontSize: 12, color: '#5FAE8F', marginBottom: 8 }}>{againStatus}</p>}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button full onClick={sendPingAgain} disabled={againBusy}>{againBusy ? 'Sending…' : 'Send ping'}</Button>
+                <Button full variant="secondary" onClick={() => setPingingAgain(null)}>Close</Button>
               </div>
             </div>
           )}
@@ -614,6 +978,7 @@ export default function FireflyPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [tab, setTab] = useState<Tab>('help');
+  const [userId, setUserId] = useState<string | null>(null);
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase.rpc('firefly_get_profile');
@@ -624,6 +989,7 @@ export default function FireflyPage() {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push('/login'); return; }
+      setUserId(session.user.id);
       const { data: ids } = await supabase.from('identities').select('id, business, display_name, is_active').order('created_at');
       if (ids) setIdentities(ids as Identity[]);
       await loadProfile();
@@ -671,9 +1037,11 @@ export default function FireflyPage() {
                 </button>
               ))}
             </div>
-            {tab === 'help' && <NeedHelpTab />}
-            {tab === 'available' && isProvider && <AvailableTab availableUntil={profile.available_until} onChange={loadProfile} />}
-            {tab === 'history' && <HistoryTab />}
+            {tab === 'help' && userId && <NeedHelpTab userId={userId} />}
+            {tab === 'available' && isProvider && (
+              <AvailableTab availableUntil={profile.available_until} scheduleActive={profile.schedule_active} onChange={loadProfile} />
+            )}
+            {tab === 'history' && userId && <HistoryTab userId={userId} />}
           </>
         )}
       </div>
