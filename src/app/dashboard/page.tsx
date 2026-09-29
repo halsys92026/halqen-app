@@ -667,7 +667,11 @@ export default function Dashboard() {
   async function recordConsentIfNeeded(uid: string) {
     const { data: existing } = await supabase.from('consents').select('id').eq('user_id', uid).limit(1);
     if (existing && existing.length > 0) return;
-    await supabase.from('consents').insert({ user_id: uid, terms_version: '2026-09', account_type: 'contractor' });
+    // Halqen is no longer contractor-only — this dashboard now serves property
+    // managers, homeowners, landlords, businesses, agents, and contractors alike.
+    // 'other' matches the same catch-all default used by Firefly's own
+    // user_type field, since we don't collect a specific account type at signup.
+    await supabase.from('consents').insert({ user_id: uid, terms_version: '2026-09', account_type: 'other' });
   }
 
   async function loadIdentities() {
