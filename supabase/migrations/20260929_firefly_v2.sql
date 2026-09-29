@@ -358,6 +358,15 @@ begin
 end;
 $$;
 
+-- Closing a ping now also wipes its photo, same as the note/location.
+create or replace function public.firefly_close_ping(p_ping_id uuid)
+returns void
+language sql security definer set search_path = public
+as $$
+  update public.firefly_pings set closed_at = now(), lat = null, lng = null, note = null, photo_path = null
+   where id = p_ping_id and requester_id = auth.uid() and closed_at is null;
+$$;
+
 -- Purge now also clears photos from storage on expiry.
 create or replace function public.firefly_purge()
 returns void
