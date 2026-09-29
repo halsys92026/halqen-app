@@ -63,20 +63,35 @@ create policy firefly_photo_insert on storage.objects
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+-- A storage RLS policy is checked with the CALLING role's own table
+-- privileges, not as security definer -- so a policy that references
+-- firefly_pings/firefly_ping_recipients directly fails for everyone with
+-- "permission denied", since those tables intentionally have no grants to
+-- authenticated at all (access only via the RPC functions). Route the
+-- eligibility check through a security-definer function instead, same
+-- pattern as firefly_is_blocked elsewhere in this schema.
+create or replace function public.firefly_can_view_photo(p_path text)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select
+    split_part(p_path, '/', 1) = auth.uid()::text
+    or exists (
+      select 1 from public.firefly_pings p
+      join public.firefly_ping_recipients r on r.ping_id = p.id
+      where p.photo_path = p_path
+        and r.provider_id = auth.uid()
+    );
+$$;
+revoke execute on function public.firefly_can_view_photo(text) from public, anon;
+grant execute on function public.firefly_can_view_photo(text) to authenticated;
+
 drop policy if exists firefly_photo_select on storage.objects;
 create policy firefly_photo_select on storage.objects
   for select to authenticated
   using (
     bucket_id = 'firefly-ping-photos'
-    and (
-      (storage.foldername(name))[1] = auth.uid()::text
-      or exists (
-        select 1 from public.firefly_pings p
-        join public.firefly_ping_recipients r on r.ping_id = p.id
-        where p.photo_path = storage.objects.name
-          and r.provider_id = auth.uid()
-      )
-    )
+    and public.firefly_can_view_photo(name)
   );
 
 drop policy if exists firefly_photo_delete on storage.objects;
