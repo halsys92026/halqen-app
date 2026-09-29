@@ -200,7 +200,7 @@ as $$
   select p.display_name, p.user_type, p.provider_identity_id, p.services,
          (select a.expires_at from public.firefly_availability a
            where a.user_id = auth.uid() and a.expires_at > now()),
-         exists (select 1 from public.firefly_effective_availability e where e.user_id = auth.uid())
+         exists (select 1 from public.firefly_effective_availability() e where e.user_id = auth.uid())
     from public.firefly_profiles p
    where p.user_id = auth.uid();
 $$;
@@ -242,7 +242,7 @@ begin
 
   insert into public.firefly_ping_recipients (ping_id, provider_id)
   select new_ping.id, e.user_id
-    from public.firefly_effective_availability e
+    from public.firefly_effective_availability() e
     join public.firefly_profiles fp on fp.user_id = e.user_id
     join public.identities i on i.id = fp.provider_identity_id and i.is_active = true
    where e.user_id <> auth.uid()
@@ -320,7 +320,7 @@ begin
     from public.firefly_ping_recipients r
     join public.firefly_pings p on p.id = r.ping_id
     left join public.firefly_profiles fp on fp.user_id = p.requester_id
-    left join public.firefly_effective_availability a on a.user_id = r.provider_id
+    left join public.firefly_effective_availability() a on a.user_id = r.provider_id
    where r.provider_id = auth.uid()
      and r.status = 'pending'
      and p.expires_at > now() and p.closed_at is null
