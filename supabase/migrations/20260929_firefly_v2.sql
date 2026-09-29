@@ -366,13 +366,12 @@ as $$
 begin
   delete from public.firefly_availability where expires_at < now();
 
-  delete from storage.objects o
-   using public.firefly_pings p
-   where o.bucket_id = 'firefly-ping-photos'
-     and o.name = p.photo_path
-     and p.expires_at < now()
-     and p.photo_path is not null;
-
+  -- Supabase does not allow deleting storage.objects rows directly via SQL
+  -- (must go through the Storage API), so we only clear the pointer here.
+  -- The underlying file is orphaned in storage rather than deleted, but it
+  -- becomes unreachable through the app once photo_path is nulled, since
+  -- every read path is gated on this column matching. A periodic Storage
+  -- API cleanup job can reclaim the space later if it's ever worth doing.
   update public.firefly_pings
      set lat = null, lng = null, note = null, photo_path = null, closed_at = coalesce(closed_at, now())
    where expires_at < now() and (lat is not null or note is not null or photo_path is not null);
