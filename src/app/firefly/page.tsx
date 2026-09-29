@@ -375,6 +375,7 @@ function NeedHelpTab({ userId }: { userId: string }) {
   const [service, setService] = useState('plumbing');
   const [radius, setRadius] = useState(15);
   const [note, setNote] = useState('');
+  const [whereOnSite, setWhereOnSite] = useState('');
   const [sending, setSending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -424,15 +425,16 @@ function NeedHelpTab({ userId }: { userId: string }) {
       }
       let photoPath: string | null = null;
       if (photo) photoPath = await uploadPingPhoto(photo, userId);
+      const fullNote = whereOnSite.trim() ? `${whereOnSite.trim()}: ${note.trim()}`.trim().replace(/:\s*$/, '') : note;
       const { data, error: err } = await supabase.rpc('firefly_send_ping', {
-        p_service: service, p_lat: lat, p_lng: lng, p_radius_km: radius, p_note: note, p_photo_path: photoPath,
+        p_service: service, p_lat: lat, p_lng: lng, p_radius_km: radius, p_note: fullNote, p_photo_path: photoPath,
       });
       if (err) throw new Error(friendlyError(err.message));
       const n = (data as { recipients: number }[])?.[0]?.recipients ?? 0;
       setStatus(n === 0
         ? 'Ping sent, but no verified providers for that service are available nearby right now. Try a wider radius or check back soon.'
         : `Ping sent to ${n} available provider${n === 1 ? '' : 's'}. Answers show up below; the ping closes in 30 minutes.`);
-      setNote(''); setPhoto(null);
+      setNote(''); setWhereOnSite(''); setPhoto(null);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -464,14 +466,14 @@ function NeedHelpTab({ userId }: { userId: string }) {
         <label style={{ ...muted, display: 'block', marginBottom: 6 }}>How far: {radius} km (about {Math.round(radius * 0.62)} miles)</label>
         <input type="range" min={2} max={80} value={radius} onChange={(e) => setRadius(Number(e.target.value))} style={{ width: '100%', marginBottom: 14 }} />
 
-        <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Where from</label>
+        <label style={{ ...muted, display: 'block', marginBottom: 6 }}>Service location (property or site — used to find nearby providers)</label>
         <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={selectStyle}>
           <option value="">Use my current location</option>
           {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
         </select>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <input
-            placeholder="Save current location as… e.g. Main office"
+            placeholder="Save this property as… e.g. Main office, 5807 SE Belmont"
             value={newLocationLabel}
             maxLength={60}
             onChange={(e) => setNewLocationLabel(e.target.value)}
@@ -492,6 +494,13 @@ function NeedHelpTab({ userId }: { userId: string }) {
           </div>
         )}
 
+        <Input
+          label="Where on site (optional, e.g. Bathroom, Unit 2, Rear building)"
+          value={whereOnSite}
+          maxLength={40}
+          placeholder="e.g. Bathroom"
+          onChange={(e) => setWhereOnSite(e.target.value)}
+        />
         <Input
           label="Short note (optional, no addresses or names)"
           value={note}
@@ -827,6 +836,7 @@ function HistoryTab({ userId }: { userId: string }) {
   const [privateNote, setPrivateNote] = useState('');
   const [pingingAgain, setPingingAgain] = useState<Connection | null>(null);
   const [againNote, setAgainNote] = useState('');
+  const [againWhereOnSite, setAgainWhereOnSite] = useState('');
   const [againPhoto, setAgainPhoto] = useState<File | null>(null);
   const [againLocationId, setAgainLocationId] = useState('');
   const [againBusy, setAgainBusy] = useState(false);
@@ -880,12 +890,13 @@ function HistoryTab({ userId }: { userId: string }) {
       }
       let photoPath: string | null = null;
       if (againPhoto) photoPath = await uploadPingPhoto(againPhoto, userId);
+      const fullNote = againWhereOnSite.trim() ? `${againWhereOnSite.trim()}: ${againNote.trim()}`.trim().replace(/:\s*$/, '') : againNote;
       const { error: err } = await supabase.rpc('firefly_ping_again', {
-        p_connection_id: pingingAgain.connection_id, p_lat: lat, p_lng: lng, p_note: againNote, p_photo_path: photoPath,
+        p_connection_id: pingingAgain.connection_id, p_lat: lat, p_lng: lng, p_note: fullNote, p_photo_path: photoPath,
       });
       if (err) throw new Error(friendlyError(err.message));
       setAgainStatus(`Pinged ${pingingAgain.other_label} directly. Check the Need help tab for their answer.`);
-      setAgainNote(''); setAgainPhoto(null);
+      setAgainNote(''); setAgainWhereOnSite(''); setAgainPhoto(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
     }
@@ -950,6 +961,13 @@ function HistoryTab({ userId }: { userId: string }) {
                 <option value="">Use my current location</option>
                 {locations.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
+              <input
+                placeholder="Where on site (optional), e.g. Bathroom"
+                value={againWhereOnSite}
+                maxLength={40}
+                onChange={(e) => setAgainWhereOnSite(e.target.value)}
+                style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #22305e', background: '#0A1330', color: '#F2EEE6', fontSize: 13 }}
+              />
               <textarea
                 placeholder="Short note (optional)"
                 value={againNote}
