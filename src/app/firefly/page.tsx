@@ -1038,6 +1038,18 @@ function FireflyComingSoon() {
             Firefly connects you with nearby service providers in real time. We&apos;re building up a
             network of verified providers in your area before turning this on — check back soon.
           </p>
+          <div style={{ marginTop: 22 }}>
+            <a
+              href="/firefly/about"
+              style={{
+                display: 'inline-block', fontSize: 13, fontWeight: 600, color: '#0A1330',
+                background: 'linear-gradient(135deg, #5AA7FF, #2F6BFF)', borderRadius: 12,
+                padding: '11px 20px', textDecoration: 'none',
+              }}
+            >
+              Learn more
+            </a>
+          </div>
         </div>
       </div>
     </div>
