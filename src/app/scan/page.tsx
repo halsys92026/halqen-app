@@ -84,11 +84,13 @@ export default function ScanPage() {
     }
   }
 
+  const CODE_LENGTH = 6;
+
   function pressDigit(d: string) {
-    if (entered.length >= 4 || loading) return;
+    if (entered.length >= CODE_LENGTH || loading) return;
     const next = entered + d;
     setEntered(next);
-    if (next.length === 4) {
+    if (next.length === CODE_LENGTH) {
       submitCode(next);
     }
   }
@@ -148,15 +150,15 @@ export default function ScanPage() {
             <div style={{ color: '#8B93B8', fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 24 }}>
               Enter access code
             </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 20, animation: shake ? 'hq-shake 0.4s' : 'none' }}>
-              {[0, 1, 2, 3].map((i) => (
+            <div style={{ display: 'flex', gap: 7, marginBottom: 20, animation: shake ? 'hq-shake 0.4s' : 'none' }}>
+              {Array.from({ length: CODE_LENGTH }, (_, i) => i).map((i) => (
                 <div
                   key={i}
                   style={{
-                    width: 48, height: 56, borderRadius: 12,
+                    width: 40, height: 52, borderRadius: 10,
                     border: `1.5px solid ${entered.length > i ? '#5AA7FF' : '#22305e'}`,
                     background: '#0A1330', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#F2EEE6', fontSize: 20, fontFamily: 'monospace',
+                    color: '#F2EEE6', fontSize: 18, fontFamily: 'monospace',
                     boxShadow: entered.length > i ? '0 0 0 3px rgba(90,167,255,0.15)' : 'none',
                     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                   }}
