@@ -107,6 +107,14 @@ export default function BetaSignupPage() {
           </p>
         </div>
 
+        <div style={{ background: 'rgba(224,122,99,0.1)', border: '1px solid rgba(224,122,99,0.35)', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
+          <p style={{ fontSize: 12.5, color: '#e0a999', lineHeight: 1.6, marginBottom: 0 }}>
+            Halqen verifies that a profile belongs to the person presenting it — it is not a substitute for a
+            government-issued ID, driver&apos;s license, passport, or any other legal document, and should not
+            be relied on as one.
+          </p>
+        </div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 20 }}>
           <Point
             title="What we'd like you to do"
