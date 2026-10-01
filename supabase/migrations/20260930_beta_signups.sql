@@ -23,11 +23,16 @@ create table if not exists public.beta_signups (
   ip_hash text,
   status text not null default 'new',
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint unique_beta_signup_email unique (lower(email))
+  updated_at timestamptz not null default now()
 );
 
 create index if not exists beta_signups_created_at_idx on public.beta_signups(created_at desc);
+
+-- Postgres table constraints only take plain column names, not expressions
+-- like lower(email) — a unique index is the correct way to enforce
+-- case-insensitive uniqueness, and on conflict (lower(email)) below matches
+-- against this index.
+create unique index if not exists beta_signups_email_unique_idx on public.beta_signups (lower(email));
 
 alter table public.beta_signups enable row level security;
 
