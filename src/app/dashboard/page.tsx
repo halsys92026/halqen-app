@@ -164,8 +164,11 @@ function CredentialsSection({ identityId }: { identityId: string }) {
 
   return (
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #22305e' }}>
-      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 10 }}>
+      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>
         Credentials
+      </p>
+      <p style={{ fontSize: 11.5, color: '#e0a999', lineHeight: 1.5, marginBottom: 10, padding: '8px 10px', background: 'rgba(224,122,99,0.08)', border: '1px solid rgba(224,122,99,0.25)', borderRadius: 8 }}>
+        Beta testing note: credentials you add here are self-reported so you can preview what a verified profile looks like. They are not actually confirmed by Halqen yet — once we launch, our team verifies each license and insurance certificate before it shows as verified.
       </p>
       {credentials.length === 0 && !showForm && (
         <p style={{ fontSize: 12, color: '#5c6588', marginBottom: 8 }}>No credentials added yet.</p>
@@ -192,7 +195,7 @@ function CredentialsSection({ identityId }: { identityId: string }) {
               {c.status === 'active' ? (
                 <span style={{ color: '#5FAE8F', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ display: 'inline-flex', width: 12, height: 12, borderRadius: '50%', background: 'rgba(95,174,143,0.15)', alignItems: 'center', justifyContent: 'center', fontSize: 8 }}>✓</span>
-                  Verified {c.last_verified_at ? new Date(c.last_verified_at).toLocaleDateString() : ''} ({c.verification_confidence || 'best_effort'})
+                  Self-reported as verified (beta) {c.last_verified_at ? new Date(c.last_verified_at).toLocaleDateString() : ''}
                 </span>
               ) : (
                 <span style={{ color: '#8B93B8' }}>Unverified</span>
@@ -201,7 +204,7 @@ function CredentialsSection({ identityId }: { identityId: string }) {
           </div>
           <div style={{ display: 'flex', gap: 2 }}>
             {c.status !== 'active' && (
-              <Button variant="ghost" style={{ color: '#5FAE8F' }} onClick={() => markVerified(c.id)}>Mark verified</Button>
+              <Button variant="ghost" style={{ color: '#5FAE8F' }} onClick={() => markVerified(c.id)}>Mark self-verified (beta)</Button>
             )}
             <Button variant="ghost" onClick={() => startEdit(c)}>Edit</Button>
             <Button variant="ghost" onClick={() => removeCredential(c.id)}>Remove</Button>

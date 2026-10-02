@@ -125,7 +125,10 @@ function EmployeeCredentialsSection({ employeeId }: { employeeId: string }) {
 
   return (
     <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #22305e' }}>
-      <p style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 8 }}>Credentials</p>
+      <p style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>Credentials</p>
+      <p style={{ fontSize: 11, color: '#e0a999', lineHeight: 1.5, marginBottom: 8, padding: '7px 9px', background: 'rgba(224,122,99,0.08)', border: '1px solid rgba(224,122,99,0.25)', borderRadius: 8 }}>
+        Beta testing note: credentials are self-reported for preview purposes only and are not yet confirmed by Halqen. Our team verifies these before launch.
+      </p>
       {credentials.length === 0 && !showForm && <p style={{ fontSize: 12, color: '#5c6588', marginBottom: 8 }}>No credentials added yet.</p>}
       {credentials.map((c) => (
         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid #1a2450' }}>
@@ -138,11 +141,11 @@ function EmployeeCredentialsSection({ employeeId }: { employeeId: string }) {
               </span>
             )}
             <div style={{ fontSize: 10.5, marginTop: 2 }}>
-              {c.status === 'active' ? <span style={{ color: '#5FAE8F' }}>✓ Verified {c.last_verified_at ? new Date(c.last_verified_at).toLocaleDateString() : ''}</span> : <span style={{ color: '#8B93B8' }}>Unverified</span>}
+              {c.status === 'active' ? <span style={{ color: '#5FAE8F' }}>✓ Self-reported as verified (beta) {c.last_verified_at ? new Date(c.last_verified_at).toLocaleDateString() : ''}</span> : <span style={{ color: '#8B93B8' }}>Unverified</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            {c.status !== 'active' && <Button variant="ghost" style={{ color: '#5FAE8F', fontSize: 11 }} onClick={() => markVerified(c.id)}>Verify</Button>}
+            {c.status !== 'active' && <Button variant="ghost" style={{ color: '#5FAE8F', fontSize: 11 }} onClick={() => markVerified(c.id)}>Mark self-verified (beta)</Button>}
             <Button variant="ghost" style={{ fontSize: 11 }} onClick={() => startEdit(c)}>Edit</Button>
             <Button variant="ghost" style={{ fontSize: 11 }} onClick={() => removeCredential(c.id)}>Remove</Button>
           </div>
