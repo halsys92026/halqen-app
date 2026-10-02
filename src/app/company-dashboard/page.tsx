@@ -126,8 +126,14 @@ function EmployeeCredentialsSection({ employeeId }: { employeeId: string }) {
   return (
     <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #22305e' }}>
       <p style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>Credentials</p>
+      <p style={{ fontSize: 11.5, color: '#8B93B8', lineHeight: 1.6, marginBottom: 8 }}>
+        Track this employee&apos;s licenses, insurance, bonds, or other qualifications here — their contractor
+        license, a COI, a background check, whatever your business requires of them. Set an expiration date and
+        you&apos;ll get a warning badge as it approaches, so a lapsed credential doesn&apos;t send someone to a job
+        site without current coverage.
+      </p>
       <p style={{ fontSize: 11, color: '#e0a999', lineHeight: 1.5, marginBottom: 8, padding: '7px 9px', background: 'rgba(224,122,99,0.08)', border: '1px solid rgba(224,122,99,0.25)', borderRadius: 8 }}>
-        Beta testing note: credentials are self-reported for preview purposes only and are not yet confirmed by Halqen. Our team verifies these before launch.
+        Beta testing note: credentials are self-reported for preview purposes only, are not shown to anyone who scans this employee&apos;s code yet, and are not yet confirmed by Halqen. Our team verifies these before launch.
       </p>
       {credentials.length === 0 && !showForm && <p style={{ fontSize: 12, color: '#5c6588', marginBottom: 8 }}>No credentials added yet.</p>}
       {credentials.map((c) => (
@@ -244,6 +250,11 @@ function EmployeeCardTokensSection({ employeeId }: { employeeId: string }) {
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #22305e' }}>
       <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
         NFC cards ({active.length})
+      </p>
+      <p style={{ fontSize: 11.5, color: '#8B93B8', lineHeight: 1.6, marginBottom: 8 }}>
+        Register a physical card for this employee so a tap pulls up their profile instead of them reading out a
+        code. Each card gets its own link — if one goes missing, revoke just that card and issue a replacement
+        without affecting the employee&apos;s code or any other card they carry.
       </p>
       {active.map((c) => (
         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12, gap: 8 }}>
@@ -418,10 +429,17 @@ export default function CompanyDashboard() {
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
               <h1 style={{ fontSize: 22, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>{company.company_name}</h1>
               <span style={{ fontSize: 12, color: '#8B93B8' }}>{employees.length} employee{employees.length !== 1 ? 's' : ''}</span>
             </div>
+            <p style={{ fontSize: 13, color: '#8B93B8', lineHeight: 1.6, marginBottom: 20 }}>
+              Each employee gets their own 6-digit code and NFC card tied to this company profile. When someone looks
+              an employee up, they see your company name and brand color alongside that employee&apos;s own name,
+              role, and contact info — so every person on your team is identifiable as yours, while still keeping
+              their own code they can be individually revoked by. Revoking one employee cuts off only their codes and
+              cards immediately; it doesn&apos;t touch anyone else on the team.
+            </p>
 
             {employees.length === 0 && !editing && (
               <div style={{ background: '#111a3d', border: '1px dashed #22305e', borderRadius: 16, padding: 28, textAlign: 'center', marginBottom: 16 }}>

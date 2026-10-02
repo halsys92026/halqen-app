@@ -167,8 +167,15 @@ function CredentialsSection({ identityId }: { identityId: string }) {
       <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 6 }}>
         Credentials
       </p>
+      <p style={{ fontSize: 12, color: '#8B93B8', lineHeight: 1.6, marginBottom: 8 }}>
+        Add the licenses, insurance, bonds, or other qualifications you want on record for this identity —
+        a contractor license, a general liability certificate of insurance, a bond, a business license, a background
+        check, or anything else relevant to your work. Enter the license or policy number, who issued it, and when
+        it expires, and you&apos;ll see a warning badge here as that date approaches so nothing lapses without your
+        noticing.
+      </p>
       <p style={{ fontSize: 11.5, color: '#e0a999', lineHeight: 1.5, marginBottom: 10, padding: '8px 10px', background: 'rgba(224,122,99,0.08)', border: '1px solid rgba(224,122,99,0.25)', borderRadius: 8 }}>
-        Beta testing note: credentials you add here are self-reported so you can preview what a verified profile looks like. They are not actually confirmed by Halqen yet — once we launch, our team verifies each license and insurance certificate before it shows as verified.
+        Beta testing note: credentials you add here are self-reported so you can preview what a verified profile looks like. They are not shown to anyone who scans your code yet, and are not actually confirmed by Halqen. Once we launch, our team verifies each license and insurance certificate before it shows as verified and before it appears on your public profile.
       </p>
       {credentials.length === 0 && !showForm && (
         <p style={{ fontSize: 12, color: '#5c6588', marginBottom: 8 }}>No credentials added yet.</p>
@@ -302,6 +309,11 @@ function AccessLogSection({ identityId }: { identityId: string }) {
       </button>
       {expanded && (
         <div style={{ marginTop: 10 }}>
+          <p style={{ fontSize: 12, color: '#8B93B8', lineHeight: 1.6, marginBottom: 10 }}>
+            Every time this identity&apos;s code or card is used to look you up — whether it worked or not — it&apos;s
+            logged here. A string of failed attempts in a short span usually means someone is guessing codes; an
+            unexpected successful unlock at an odd time is worth a second look too.
+          </p>
           {logs.map((l) => (
             <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', color: '#8B93B8' }}>
               <span>{new Date(l.accessed_at).toLocaleString()}</span>
@@ -367,8 +379,12 @@ function RecipientCodesSection({ identityId }: { identityId: string }) {
       <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
         Recipient codes ({active.length})
       </p>
-      <p style={{ fontSize: 11, color: '#5c6588', marginBottom: 10 }}>
-        Give a separate code to each person instead of sharing your main one — revoking it later won&apos;t affect anyone else.
+      <p style={{ fontSize: 12, color: '#8B93B8', lineHeight: 1.6, marginBottom: 10 }}>
+        Your main access code works for anyone you give it to, but if you hand the same code to several people you
+        can&apos;t cut off just one of them later without resetting everyone&apos;s access. Generate a separate code
+        per person or relationship instead — a specific client, a property manager, a one-off job — label it so you
+        remember who it&apos;s for, and revoke it the moment that relationship ends without touching anyone else&apos;s
+        ability to look you up.
       </p>
       {active.map((c) => (
         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12 }}>
@@ -478,8 +494,11 @@ function CardTokensSection({ identityId }: { identityId: string }) {
       <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
         NFC cards ({active.length})
       </p>
-      <p style={{ fontSize: 11, color: '#5c6588', marginBottom: 10 }}>
-        Each physical card gets its own tap link — program a card with the link below, or revoke it instantly if it&apos;s lost.
+      <p style={{ fontSize: 12, color: '#8B93B8', lineHeight: 1.6, marginBottom: 10 }}>
+        A physical NFC card lets someone pull up your profile with a tap instead of typing a code — hold it near
+        their phone and the link below opens automatically, no app required on their end. You can register more than
+        one card for the same identity (a wallet card and a spare, say), and each gets its own link, so losing one
+        just means revoking that single card instead of resetting your whole identity.
       </p>
       {active.map((c) => (
         <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12, gap: 8 }}>
@@ -586,8 +605,15 @@ function GrantsSection({ identityId }: { identityId: string }) {
 
   return (
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #22305e' }}>
-      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 10 }}>
+      <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#8B93B8', marginBottom: 4 }}>
         Clients with standing access ({active.length})
+      </p>
+      <p style={{ fontSize: 12, color: '#8B93B8', lineHeight: 1.6, marginBottom: 10 }}>
+        A client with standing access can look up your profile anytime, without you sharing a code or tapping a card
+        each time — useful for an ongoing relationship like a property management company or a repeat client who
+        needs to check your credentials regularly. Search for them by company name below to grant access, and revoke
+        it the moment the relationship ends; they&apos;ll need a code or card from you again if you ever want to
+        reconnect.
       </p>
       {active.map((g) => (
         <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12 }}>
@@ -835,10 +861,16 @@ export default function Dashboard() {
             <Button variant="ghost" onClick={logout}>Log out</Button>
           </div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
           <h1 style={{ fontSize: 22, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>Your identities</h1>
           <span style={{ fontSize: 12, color: '#8B93B8' }}>{identities.length} of 5 used</span>
         </div>
+        <p style={{ fontSize: 13, color: '#8B93B8', lineHeight: 1.6, marginBottom: 20 }}>
+          An identity is a separate profile — for a business, a role, or a side project — each with its own 6-digit
+          code and NFC card. Share the code or tap the card, and whoever&apos;s on the other end sees only what you&apos;ve
+          put on that identity: your name, business, title, and contact info. You can run up to 5 identities on one
+          account, switch between them freely, and revoke any one without affecting the others.
+        </p>
 
         {identities.length === 0 && (
           <div style={{ background: '#111a3d', border: '1px dashed #22305e', borderRadius: 16, padding: 32, textAlign: 'center', marginBottom: 16, animation: 'hq-fade-in 0.3s ease' }}>
